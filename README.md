@@ -7,6 +7,8 @@ Fast Obsidian capture with automatic semantic filing.
 - creates a new note with real related-note links, or
 - merges into an existing note when the capture is clearly an addition
 
+`gate` uses [vite-plus (`vp`)](https://viteplus.dev/) for dependency management and local development commands. Install `vp` first, then use it instead of `npm` for this repo.
+
 ## Install
 
 ```bash
@@ -57,6 +59,36 @@ Merged notes append timestamped raw captures and regenerate summary/metadata fro
 
 ## Development
 
+### Prerequisites
+
+- Node.js `>= 22`
+- `vp` installed globally
+- an Obsidian vault available for local testing
+- native installs allowed for QMD dependencies (`better-sqlite3`, `node-llama-cpp`)
+
+### First-time setup
+
+```bash
+# install dependencies
+vp install
+
+# if pnpm blocks native builds, allow and rebuild them
+pnpm approve-builds
+pnpm rebuild better-sqlite3
+
+# node-llama-cpp may also need its postinstall to run once
+node ./dist/cli/cli.js postinstall
+
+# build and link the local CLI globally
+vp pack
+vp run link
+
+# initialize against a real vault
+gate init
+```
+
+### Day-to-day workflow
+
 ```bash
 # auto-rebuild on source changes
 vp run dev
@@ -72,6 +104,35 @@ vp check --fix
 ```
 
 Because `vp run link` links the built binary, source edits take effect after rebuilds.
+
+### Verifying changes
+
+```bash
+# test capture flow
+gate add "timing output sanity check"
+
+# test semantic retrieval
+gate related "gate timing"
+
+# refresh the local index if needed
+gate index
+```
+
+For profiling work, `gate` prints total duration and a timing breakdown at the end of operations.
+
+### Contributor notes
+
+- use `vp pack`, not `vp build`; this project is a CLI, not a Vite web app
+- merge is intentionally conservative: only existing `gate`-managed notes are eligible merge targets
+- related-note search can return non-`gate` notes, but those should never be overwritten
+- QMD data is local to the vault in `.gate/qmd.sqlite`
+- first-time QMD usage may download local models into `~/.cache/qmd/models`
+
+### Troubleshooting
+
+- if QMD fails to open SQLite bindings, run `pnpm rebuild better-sqlite3`
+- if local model setup looks broken, rerun `node ./dist/cli/cli.js postinstall`
+- if the global `gate` binary seems stale, run `vp pack && vp run link`
 
 ## Project Structure
 
@@ -128,12 +189,6 @@ Config lives at `~/.config/gate/config.json`:
 ```
 
 QMD data is stored inside the vault at `.gate/qmd.sqlite`.
-
-## Notes
-
-- `vp build` is for web apps; this project is a CLI, so use `vp pack`
-- first-time embedding may take a while because QMD downloads local models
-- `gate` stays quiet during indexing except for setup
 
 ## License
 
