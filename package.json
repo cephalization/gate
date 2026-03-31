@@ -1,0 +1,39 @@
+{
+  "name": "gate",
+  "version": "0.1.0",
+  "description": "Fast Obsidian capture + retrieval CLI",
+  "keywords": [
+    "capture",
+    "cli",
+    "notes",
+    "obsidian",
+    "retrieval"
+  ],
+  "license": "MIT",
+  "author": "",
+  "bin": {
+    "gate": "./dist/cli.mjs"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vp pack --watch",
+    "link": "pnpm link --global"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.0.0",
+    "@clack/prompts": "^0.9.1",
+    "@tobilu/qmd": "^2.0.1",
+    "ai": "^4.0.0",
+    "commander": "^13.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3",
+    "vite-plus": "^0.1.15-alpha.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@10.6.5"
+}

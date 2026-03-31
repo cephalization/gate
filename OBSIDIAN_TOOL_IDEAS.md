@@ -1,9 +1,11 @@
 # gate – Obsidian Note Organizer CLI (Design v2)
 
 ## Product Direction
+
 `gate` is a **fast capture + retrieval** CLI for Obsidian vaults, built for rapid personal note flow.
 
 Primary goals:
+
 1. Capture notes with near-zero friction.
 2. Ingest longer documents when needed.
 3. Retrieve related notes from natural-language queries.
@@ -20,6 +22,7 @@ gate a "possible postmortem topic: webhook idempotency"
 ```
 
 Where:
+
 - `add` is explicit.
 - `a` is a short alias optimized for rapid note entry.
 
@@ -28,6 +31,7 @@ Where:
 Running `gate` with no subcommand should print concise help for both human and LLM orientation.
 
 ### Help goals
+
 - Human-readable in a terminal (short, obvious next actions).
 - Machine-parseable enough for agentic use (clear command taxonomy, stable option names).
 
@@ -76,6 +80,7 @@ gate init
 `gate init` should launch an interactive prompt wizard using the Bombshell Clack package.
 
 ### Wizard responsibilities
+
 1. Pick or create config path (`~/.config/gate/config.json` default).
 2. Select LLM provider/model (AI SDK compatible).
 3. Set Obsidian vault path.
@@ -84,6 +89,7 @@ gate init
 6. Write validated config file and print quick-start commands.
 
 ### Prompt flow (proposed)
+
 1. Welcome + short explanation.
 2. Detect vault candidates (optional scan, see below).
 3. Choose vault from list or enter manually.
@@ -97,6 +103,7 @@ gate init
 A home-directory scan for `.obsidian` folders is viable and useful during `init`.
 
 ### Proposed detection strategy
+
 - Scan from user home directory with guardrails:
   - bounded depth (e.g., max 4–6 levels)
   - skip heavy/system dirs (`Library`, `node_modules`, `.git`, cache dirs)
@@ -106,6 +113,7 @@ A home-directory scan for `.obsidian` folders is viable and useful during `init`
 - Present candidates in a selectable list, with a “manual path entry” fallback.
 
 ### UX notes
+
 - Scanning should be opt-in or skippable if it takes too long.
 - Always allow manual path override.
 - Persist last successful vault for faster future init/reset.
@@ -129,6 +137,7 @@ type IngestMetadata = {
 ```
 
 ### Behavior
+
 - If AI extraction succeeds: write enriched frontmatter + clean body.
 - If AI extraction fails/unavailable: fall back to deterministic parsing and still write note.
 - Always preserve raw user text in note body for traceability.
@@ -149,6 +158,7 @@ confidence: 0.82
 ```
 
 Body sections:
+
 - `## Summary`
 - `## Raw Capture`
 - `## Related`
@@ -172,6 +182,7 @@ Body sections:
 Use Obsidian CLI for vault-facing operations only (create/update/open/search where supported), while `gate` owns normalization and enrichment.
 
 Implementation guidance:
+
 - Centralize command execution in `obsidianCli.ts`.
 - Capability-detect commands at startup from `obsidian --help`.
 - Keep an adapter boundary so Obsidian CLI command changes are isolated.
@@ -179,13 +190,16 @@ Implementation guidance:
 ## Retrieval Strategy
 
 `related <query>` can combine:
+
 - Semantic ranking (QMD)
 - Lexical ranking (local fallback)
 
 Rank fusion baseline:
+
 - `finalScore = 0.7 * semanticScore + 0.3 * lexicalScore`
 
 Output should include:
+
 - title
 - score
 - short why-match rationale
