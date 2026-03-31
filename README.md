@@ -7,7 +7,7 @@ Fast Obsidian capture with automatic semantic filing.
 - creates a new note with real related-note links, or
 - merges into an existing note when the capture is clearly an addition
 
-`gate` uses [vite-plus (`vp`)](https://viteplus.dev/) for dependency management and local development commands. Install `vp` first, then use it instead of `npm` for this repo.
+`gate` uses [vite-plus (`vp`)](https://viteplus.dev/) for dependency management, local development commands, and Node runtime selection. Install `vp` first, then use it instead of `npm` for this repo.
 
 ## Install
 
@@ -65,6 +65,8 @@ Merged notes append timestamped raw captures and regenerate summary/metadata fro
 - `vp` installed globally
 - an Obsidian vault available for local testing
 - native installs allowed for QMD dependencies (`better-sqlite3`, `node-llama-cpp`)
+
+This repo pins its runtime in `.node-version`, so `vp` should select the correct Node automatically.
 
 ### First-time setup
 
