@@ -71,3 +71,10 @@ Use this knowledge to avoid repeating mistakes and build on what works.
 - Queue inspection should stay capture-focused: excluding command jobs keeps recent summaries and state counts meaningful and avoids `/queue` reporting itself as the active job.
 - Limiting queued and recent sections to a few lines keeps the snapshot readable within the shell's small visible log window while still showing totals in the counts line.
 - The focused test recipe for this repo is still temporary in-repo `tsc` output plus `node --test`; non-interactive `expect` sessions here launched Ink, but Enter submission did not behave reliably enough to count as a full manual shell validation.
+
+## tnfghaup
+
+- Reusing `searchVault()` directly for `/search` and a shared `findRelatedFromConfig()` helper for `/related` kept shell retrieval aligned with the existing CLI behavior without adding shell-only search logic.
+- Treat all slash-prefixed inputs as command jobs, including invalid ones; otherwise inputs like `/search` with a missing query fall through as captures instead of surfacing a command error in the activity log.
+- Compact log lines work best with vault-relative paths, so shell output stays readable without losing which note matched.
+- `expect` can still launch the Ink shell for smoke tests here, but Enter submission remains unreliable in automation even with fixed `COLUMNS` and `LINES`, so focused worker tests are the dependable verification path for slash-command behavior.

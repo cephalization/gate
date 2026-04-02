@@ -227,6 +227,71 @@ test("shell worker runs queued quit commands through the injected quit handler",
   assert.ok(state.log.some((event) => event.message === "/quit"));
 });
 
+test("shell worker renders compact search and related lines in the activity log", async () => {
+  const worker = createShellWorker({
+    config,
+    createJobId: (() => {
+      let nextId = 1;
+      return () => String(nextId++);
+    })(),
+    search: async (_config, query) => [
+      {
+        title: `search match for ${query}`,
+        score: 0.91,
+        filePath: "/tmp/gate-shell-worker-test-vault/Inbox/search-match.md",
+        body: "",
+      },
+    ],
+    related: async (_config, query) => [
+      {
+        title: `related match for ${query}`,
+        score: 0.84,
+        rationale: "QMD semantic match 84.0%",
+        filePath: "/tmp/gate-shell-worker-test-vault/Inbox/related-match.md",
+      },
+    ],
+  });
+
+  worker.enqueue("/search gate shell");
+  worker.enqueue("/related gate shell");
+
+  await waitFor(() => {
+    const state = worker.getState();
+    return state.queue.every((job) => job.state === "done") ? true : null;
+  });
+
+  const messages = worker.getState().log.map((event) => event.message);
+  assert.ok(messages.includes("/search gate shell"));
+  assert.ok(messages.includes("search 91.0% search match for gate shell - Inbox/search-match.md"));
+  assert.ok(messages.includes("/related gate shell"));
+  assert.ok(
+    messages.includes("related 84.0% related match for gate shell - Inbox/related-match.md"),
+  );
+});
+
+test("shell worker fails invalid slash commands instead of treating them as captures", async () => {
+  let captureCalls = 0;
+
+  const worker = createShellWorker({
+    config,
+    capture: async () => {
+      captureCalls += 1;
+      return createSuccessOutcome("unexpected-capture");
+    },
+  });
+
+  worker.enqueue("/search");
+
+  await waitFor(() => (worker.getState().queue[0]?.state === "failed" ? true : null));
+
+  const state = worker.getState();
+  assert.equal(captureCalls, 0);
+  assert.equal(state.queue[0]?.kind, "command");
+  assert.equal(state.queue[0]?.error, "missing query for /search");
+  assert.ok(state.log.some((event) => event.message === "/search"));
+  assert.ok(state.log.some((event) => event.message === "failed #1 missing query for /search"));
+});
+
 test("shell worker renders queue inspection lines from session state", async () => {
   const firstJob = createDeferred();
 

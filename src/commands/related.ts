@@ -1,6 +1,6 @@
 import { requireConfig } from "../config.js";
 import { formatDuration, formatTimingBreakdown } from "../timing.js";
-import type { RelatedNoteResult } from "../types.js";
+import type { GateConfig, RelatedNoteResult } from "../types.js";
 import { matchesToRelatedResults, searchVault } from "../store/search.js";
 
 export interface RelatedOptions {
@@ -9,16 +9,24 @@ export interface RelatedOptions {
   config?: string;
 }
 
-export async function findRelated(
+export async function findRelatedFromConfig(
+  config: GateConfig,
   query: string,
-  options: RelatedOptions = {},
+  options: Pick<RelatedOptions, "top"> = {},
 ): Promise<RelatedNoteResult[]> {
-  const config = await requireConfig(options.config);
   const matches = await searchVault(config, query, {
     limit: options.top ?? 8,
     minScore: 0.2,
   });
   return matchesToRelatedResults(matches);
+}
+
+export async function findRelated(
+  query: string,
+  options: RelatedOptions = {},
+): Promise<RelatedNoteResult[]> {
+  const config = await requireConfig(options.config);
+  return findRelatedFromConfig(config, query, options);
 }
 
 export async function handleRelated(query: string, options: RelatedOptions): Promise<void> {

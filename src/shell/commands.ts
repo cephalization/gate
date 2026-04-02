@@ -1,14 +1,11 @@
-export type ShellCommandName = "help" | "quit" | "queue";
+export type ShellCommandName = "help" | "quit" | "queue" | "search" | "related";
 
-export type ParsedShellCommand =
-  | {
-      name: ShellCommandName;
-      raw: string;
-    }
-  | {
-      name: null;
-      raw: string;
-    };
+export interface ParsedShellCommand {
+  name: ShellCommandName | "invalid" | null;
+  raw: string;
+  query?: string;
+  error?: string;
+}
 
 export type ShellQuitRequestSource = "interrupt" | "command";
 
@@ -30,25 +27,47 @@ const SHELL_HELP_LINES = [
   "commands:",
   "/help show available shell commands",
   "/queue show queued jobs, active work, recent finished jobs, and state counts",
+  "/search <query> run a QMD search without writing notes",
+  "/related <query> show compact related-note matches in the log",
   "/quit quit when idle, or warn if work is still pending",
 ] as const;
 
 export function parseShellCommand(input: string): ParsedShellCommand {
   const raw = input.trim();
 
-  if (raw === "/help") {
+  if (!raw.startsWith("/")) {
+    return { name: null, raw };
+  }
+
+  const firstSpaceIndex = raw.indexOf(" ");
+  const commandToken = (firstSpaceIndex === -1 ? raw : raw.slice(0, firstSpaceIndex)).toLowerCase();
+  const query = (firstSpaceIndex === -1 ? "" : raw.slice(firstSpaceIndex + 1)).trim();
+
+  if (commandToken === "/help" && query.length === 0) {
     return { name: "help", raw };
   }
 
-  if (raw === "/quit") {
+  if (commandToken === "/quit" && query.length === 0) {
     return { name: "quit", raw };
   }
 
-  if (raw === "/queue") {
+  if (commandToken === "/queue" && query.length === 0) {
     return { name: "queue", raw };
   }
 
-  return { name: null, raw };
+  if (commandToken === "/search") {
+    return query.length > 0
+      ? { name: "search", raw, query }
+      : { name: "invalid", raw, error: "missing query for /search" };
+  }
+
+  if (commandToken === "/related") {
+    return query.length > 0
+      ? { name: "related", raw, query }
+      : { name: "invalid", raw, error: "missing query for /related" };
+  }
+
+  return { name: "invalid", raw, error: `unknown slash command: ${commandToken}` };
 }
 
 export function getShellHelpLines(): readonly string[] {

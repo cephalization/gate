@@ -7,11 +7,34 @@ import {
   resolveShellQuitRequest,
 } from "../src/shell/commands.js";
 
-test("shell command parser recognizes help and quit slash commands", () => {
+test("shell command parser recognizes supported slash commands", () => {
   assert.deepEqual(parseShellCommand(" /help "), { name: "help", raw: "/help" });
   assert.deepEqual(parseShellCommand("/quit"), { name: "quit", raw: "/quit" });
   assert.deepEqual(parseShellCommand("/queue"), { name: "queue", raw: "/queue" });
+  assert.deepEqual(parseShellCommand("/search gate timing"), {
+    name: "search",
+    raw: "/search gate timing",
+    query: "gate timing",
+  });
+  assert.deepEqual(parseShellCommand("/related queue worker"), {
+    name: "related",
+    raw: "/related queue worker",
+    query: "queue worker",
+  });
   assert.deepEqual(parseShellCommand("capture this"), { name: null, raw: "capture this" });
+});
+
+test("shell command parser keeps slash-prefixed inputs as commands", () => {
+  assert.deepEqual(parseShellCommand("/search"), {
+    name: "invalid",
+    raw: "/search",
+    error: "missing query for /search",
+  });
+  assert.deepEqual(parseShellCommand("/wat"), {
+    name: "invalid",
+    raw: "/wat",
+    error: "unknown slash command: /wat",
+  });
 });
 
 test("shell help lines list supported slash commands", () => {
@@ -19,6 +42,8 @@ test("shell help lines list supported slash commands", () => {
     "commands:",
     "/help show available shell commands",
     "/queue show queued jobs, active work, recent finished jobs, and state counts",
+    "/search <query> run a QMD search without writing notes",
+    "/related <query> show compact related-note matches in the log",
     "/quit quit when idle, or warn if work is still pending",
   ]);
 });

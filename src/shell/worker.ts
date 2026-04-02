@@ -1,6 +1,9 @@
+import path from "node:path";
+import { findRelatedFromConfig } from "../commands/related.js";
 import { captureNoteWithHooks } from "../note/upsert.js";
 import type { CaptureHooks } from "../note/capture-pipeline.js";
-import type { AddOutcome, GateConfig } from "../types.js";
+import { searchVault } from "../store/search.js";
+import type { AddOutcome, GateConfig, QmdMatch, RelatedNoteResult } from "../types.js";
 import { getShellHelpLines, parseShellCommand } from "./commands.js";
 import {
   createQueuedShellLogEvent,
@@ -47,6 +50,8 @@ export interface ShellWorkerDependencies {
   createJobId?: () => string;
   createEventId?: () => string;
   now?: () => string;
+  search?: (config: GateConfig, query: string) => Promise<QmdMatch[]>;
+  related?: (config: GateConfig, query: string) => Promise<RelatedNoteResult[]>;
   requestQuit?: () => void;
 }
 
@@ -65,6 +70,16 @@ export interface CreateShellWorkerOptions extends ShellWorkerDependencies {
 export function createShellWorker(options: CreateShellWorkerOptions): ShellWorker {
   const capture = options.capture ?? captureNoteWithHooks;
   const now = options.now ?? (() => new Date().toISOString());
+  const search =
+    options.search ??
+    ((config: GateConfig, query: string) =>
+      searchVault(config, query, {
+        limit: 5,
+        minScore: 0.3,
+      }));
+  const related =
+    options.related ??
+    ((config: GateConfig, query: string) => findRelatedFromConfig(config, query, { top: 8 }));
   const listeners = new Set<(state: ShellSessionState) => void>();
   let nextJobNumber = 1;
   let nextEventNumber = 1;
@@ -88,47 +103,93 @@ export function createShellWorker(options: CreateShellWorkerOptions): ShellWorke
     return publishState(update(state));
   };
 
+  const appendCommandOutput = (kind: ShellLogKind, message: string): void => {
+    setState((current) =>
+      appendShellLogEvent(current, {
+        id: createEventId(),
+        timestamp: now(),
+        kind,
+        message,
+      }),
+    );
+  };
+
+  const toShellPath = (filePath: string): string => {
+    const relativePath = path.relative(options.config.vaultPath, filePath);
+    return relativePath.length > 0 && !relativePath.startsWith("..") ? relativePath : filePath;
+  };
+
+  const formatSearchLine = (match: QmdMatch): string => {
+    return `search ${(match.score * 100).toFixed(1)}% ${match.title} - ${toShellPath(match.filePath)}`;
+  };
+
+  const formatRelatedLine = (result: RelatedNoteResult): string => {
+    return `related ${(result.score * 100).toFixed(1)}% ${result.title} - ${toShellPath(result.filePath)}`;
+  };
+
   const processCommandJob = async (job: ShellJob): Promise<void> => {
     const timestamp = now();
-    const command = parseShellCommand(job.input);
+    const parsedCommand = parseShellCommand(job.input);
 
     setState((current) =>
       appendShellLogEvent(current, {
         id: createEventId(),
         timestamp,
         kind: "command",
-        message: command.raw,
+        message: parsedCommand.raw,
       }),
     );
 
-    if (command.name === "help") {
-      for (const line of getShellHelpLines()) {
-        setState((current) =>
-          appendShellLogEvent(current, {
-            id: createEventId(),
-            timestamp: now(),
-            kind: "system",
-            message: line,
-          }),
-        );
-      }
+    if (parsedCommand.name === null) {
+      throw new Error("invalid command job");
     }
 
-    if (command.name === "queue") {
-      for (const line of getShellQueueInspectionLines(state)) {
-        setState((current) =>
-          appendShellLogEvent(current, {
-            id: createEventId(),
-            timestamp: now(),
-            kind: "system",
-            message: line,
-          }),
-        );
-      }
+    if (parsedCommand.name === "invalid") {
+      throw new Error(parsedCommand.error ?? "invalid slash command");
     }
 
-    if (command.name === "quit") {
-      options.requestQuit?.();
+    const command = parsedCommand;
+
+    switch (command.name) {
+      case "help":
+        for (const line of getShellHelpLines()) {
+          appendCommandOutput("system", line);
+        }
+        break;
+      case "quit":
+        options.requestQuit?.();
+        break;
+      case "queue":
+        for (const line of getShellQueueInspectionLines(state)) {
+          appendCommandOutput("system", line);
+        }
+        break;
+      case "search": {
+        const query = command.query ?? "";
+        const matches = await search(options.config, query);
+
+        if (matches.length === 0) {
+          appendCommandOutput("system", `search no results for ${JSON.stringify(query)}`);
+        } else {
+          for (const match of matches) {
+            appendCommandOutput("system", formatSearchLine(match));
+          }
+        }
+        break;
+      }
+      case "related": {
+        const query = command.query ?? "";
+        const results = await related(options.config, query);
+
+        if (results.length === 0) {
+          appendCommandOutput("system", `related no results for ${JSON.stringify(query)}`);
+        } else {
+          for (const result of results) {
+            appendCommandOutput("system", formatRelatedLine(result));
+          }
+        }
+        break;
+      }
     }
 
     setState((current) =>
