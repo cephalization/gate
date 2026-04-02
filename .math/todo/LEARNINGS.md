@@ -23,3 +23,10 @@ Use this knowledge to avoid repeating mistakes and build on what works.
 - Keep the pipeline conservative by only filtering merge candidates for merge/classify decisions; note creation should still receive the full search match list for related-note suggestions.
 - Hooking `onStageChange` before each stage and `onTiming` after each stage cleanly exposes worker state transitions and per-stage durations from the same pipeline.
 - A standalone `node:test` file under `test/` works well here because it can import the pure `.ts` pipeline with Node type stripping without changing the repo TypeScript config.
+
+## kojufw8t
+
+- Keep the first shell pass narrowly scoped to pure state modules: `types`, `queue`, `events`, and `session` were enough to model jobs, submit mode, logs, and derived stats without pulling in UI or worker code early.
+- Deriving session stats from the queue keeps reducers deterministic and avoids hidden counters drifting out of sync once retries or failures are introduced later.
+- For focused TypeScript unit tests in this repo, compiling a `.test.ts` file with `pnpm exec tsc --module NodeNext --moduleResolution NodeNext --types node` is more reliable than importing source `.ts` files directly with Node.
+- Queue depth is easier to reason about as "queued but not currently active" so the status bar can show pending backlog separately from worker busy/idle state.
