@@ -44,3 +44,10 @@ Use this knowledge to avoid repeating mistakes and build on what works.
 - Publishing stage changes from the pipeline hooks directly into both `ShellJob.state` and the activity log keeps worker progress durable without duplicating the capture logic in shell-specific code.
 - For focused shell tests in this repo, compile a `.test.ts` file into a temporary directory inside the repo before running `node --test`; compiling outside the workspace breaks package resolution for runtime deps like `ai`.
 - `vp check --fix` is the fastest way to align new Ink/worker files with the project formatter before the required verification pass.
+
+## jr8cw273
+
+- Keeping the new input behavior in a small pure `src/shell/input.ts` module made multiline submit rules and Up/Down history easy to test without adding Ink rendering tests.
+- `Ctrl+J` handling needs to be checked before normal Enter handling because some terminals report it as a control-return style key event rather than plain text input.
+- Restricting history navigation to single-line entries keeps multiline compose stable and matches the "capture first" shell workflow instead of letting Up/Down unexpectedly replace a draft with a multiline payload.
+- For this repo's ESM `.js` source imports, the reliable focused test path is still: temporary `tsc` output inside the workspace, then `node --test` on the emitted files.

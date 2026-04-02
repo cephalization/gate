@@ -27,6 +27,16 @@ export function toggleShellSubmitMode(mode: ShellSubmitMode): ShellSubmitMode {
   return mode === "enter-submit" ? "shift-enter-submit" : "enter-submit";
 }
 
+export function setShellSubmitMode(
+  state: ShellSessionState,
+  submitMode: ShellSubmitMode,
+): ShellSessionState {
+  return {
+    ...state,
+    submitMode,
+  };
+}
+
 export function appendShellLogEvent(
   state: ShellSessionState,
   event: ShellLogEvent,

@@ -19,7 +19,9 @@ import {
   addShellJob,
   appendShellLogEvent,
   createShellSessionState,
+  setShellSubmitMode,
   setActiveShellJobId,
+  toggleShellSubmitMode,
   updateShellSessionJob,
 } from "./session.js";
 import type { ShellJob, ShellSessionState } from "./types.js";
@@ -49,6 +51,7 @@ export interface ShellWorker {
   enqueue: (input: string) => ShellJob;
   getState: () => ShellSessionState;
   subscribe: (listener: (state: ShellSessionState) => void) => () => void;
+  toggleSubmitMode: () => void;
 }
 
 export interface CreateShellWorkerOptions extends ShellWorkerDependencies {
@@ -196,6 +199,9 @@ export function createShellWorker(options: CreateShellWorkerOptions): ShellWorke
       return () => {
         listeners.delete(listener);
       };
+    },
+    toggleSubmitMode(): void {
+      setState((current) => setShellSubmitMode(current, toggleShellSubmitMode(current.submitMode)));
     },
   };
 }
