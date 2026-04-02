@@ -58,3 +58,9 @@ Use this knowledge to avoid repeating mistakes and build on what works.
 - UI-originated shell log entries need to go through the worker store; app-local log state gets overwritten by the next worker publish.
 - For consistent first-warning/second-force Ctrl+C handling, read pending-work state from `worker.getState()` and track the warning latch in a ref so overlapping interrupt events do not race React state updates.
 - `expect` works better than piped pseudo-tty tricks for manual Ink shell validation in this repo because Ink requires a real raw-mode TTY.
+
+## x8pnofay
+
+- Treating slash inputs as a separate shell job kind let the existing worker queue schedule commands ahead of later captures without adding a second queue or preempting the active capture.
+- Session stats should continue to reflect capture throughput only; counting completed command jobs would make the shell header misleading after frequent `/help` or future read-only commands.
+- Manual Ink validation is reliable with `expect`: queue captures and `/help` quickly, then assert the help output appears before the later capture completes and that the temp vault only contains the capture-created notes.

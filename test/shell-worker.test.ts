@@ -156,3 +156,73 @@ test("shell worker logs failures and continues processing later jobs", async () 
   assert.ok(state.log.some((event) => event.message === "failed #1 search failed"));
   assert.ok(state.log.some((event) => event.message === "done #2 created: recovered-note 5ms"));
 });
+
+test("shell worker prioritizes queued slash commands ahead of later captures", async () => {
+  const started: string[] = [];
+  const firstJob = createDeferred();
+
+  const worker = createShellWorker({
+    config,
+    createJobId: (() => {
+      let nextId = 1;
+      return () => String(nextId++);
+    })(),
+    now: (() => {
+      let nextTick = 0;
+      return () => `2026-04-02T00:02:0${nextTick++}.000Z`;
+    })(),
+    capture: async (_config, text, _source, hooks = {}) => {
+      started.push(text);
+      await hooks.onStageChange?.("refresh");
+
+      if (text === "first capture") {
+        await firstJob.promise;
+      }
+
+      await hooks.onStageChange?.("write");
+      await hooks.onTiming?.("write", 2);
+      return createSuccessOutcome(text.split(" ").join("-"));
+    },
+  });
+
+  worker.enqueue("first capture");
+
+  await waitFor(() => (worker.getState().activeJobId === "1" ? true : null));
+
+  worker.enqueue("second capture");
+  worker.enqueue("/help");
+  firstJob.resolve();
+
+  await waitFor(() => {
+    const state = worker.getState();
+    return state.queue.every((job) => job.state === "done") ? true : null;
+  });
+
+  const state = worker.getState();
+  assert.deepEqual(started, ["first capture", "second capture"]);
+  assert.equal(state.queue[1]?.kind, "capture");
+  assert.equal(state.queue[2]?.kind, "command");
+  assert.ok(state.log.some((event) => event.message === "/help"));
+  assert.ok(state.log.some((event) => event.message === "commands:"));
+  assert.ok(state.log.some((event) => event.message === "/help show available shell commands"));
+});
+
+test("shell worker runs queued quit commands through the injected quit handler", async () => {
+  let quitRequests = 0;
+
+  const worker = createShellWorker({
+    config,
+    requestQuit: () => {
+      quitRequests += 1;
+    },
+  });
+
+  worker.enqueue("/quit");
+
+  await waitFor(() => (worker.getState().queue[0]?.state === "done" ? true : null));
+
+  const state = worker.getState();
+  assert.equal(quitRequests, 1);
+  assert.equal(state.queue[0]?.kind, "command");
+  assert.ok(state.log.some((event) => event.message === "/quit"));
+});

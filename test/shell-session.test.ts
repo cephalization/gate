@@ -65,6 +65,7 @@ test("queue helpers create and update shell jobs immutably", () => {
   });
 
   assert.equal(created.state, "queued");
+  assert.equal(created.kind, "capture");
   assert.equal(created.source, "gate-shell");
   assert.deepEqual(created.timings, {});
 
@@ -78,6 +79,29 @@ test("queue helpers create and update shell jobs immutably", () => {
   assert.equal(queue[0]?.state, "queued");
   assert.equal(updatedQueue[0]?.state, "searching");
   assert.equal(updatedQueue[0]?.timings.search, 2800);
+});
+
+test("queue picks queued slash commands before later capture jobs", () => {
+  const firstCapture = createShellJob({
+    id: "201",
+    input: "first capture",
+    createdAt: "2026-04-02T00:00:00.000Z",
+  });
+  const slashCommand = createShellJob({
+    id: "202",
+    input: "/help",
+    createdAt: "2026-04-02T00:00:01.000Z",
+    kind: "command",
+  });
+  const secondCapture = createShellJob({
+    id: "203",
+    input: "second capture",
+    createdAt: "2026-04-02T00:00:02.000Z",
+  });
+
+  const nextJob = getNextQueuedShellJob([firstCapture, slashCommand, secondCapture]);
+  assert.equal(nextJob?.id, "202");
+  assert.equal(nextJob?.kind, "command");
 });
 
 test("job helpers capture completion, failures, and total duration", () => {
@@ -138,11 +162,20 @@ test("session helpers derive stats, queue depth, worker state, and submit mode",
     ),
     "classification failed",
   );
+  const command = completeShellJob(
+    createShellJob({
+      id: "106",
+      input: "/help",
+      createdAt: "2026-04-02T00:00:03.000Z",
+      kind: "command",
+    }),
+  );
 
   let state = createShellSessionState();
   state = addShellJob(state, queued);
   state = addShellJob(state, completed);
   state = addShellJob(state, failed);
+  state = addShellJob(state, command);
 
   assert.deepEqual(calculateShellSessionStats(state.queue), {
     completed: 1,

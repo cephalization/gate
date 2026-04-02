@@ -13,6 +13,10 @@ export const SHELL_JOB_STATES = [
   "failed",
 ] as const;
 
+export const SHELL_JOB_KINDS = ["capture", "command"] as const;
+
+export type ShellJobKind = (typeof SHELL_JOB_KINDS)[number];
+
 export type ShellJobState = (typeof SHELL_JOB_STATES)[number];
 
 export const SHELL_SUBMIT_MODES = ["enter-submit", "shift-enter-submit"] as const;
@@ -29,6 +33,7 @@ export interface ShellJob {
   id: string;
   createdAt: string;
   input: string;
+  kind: ShellJobKind;
   source: "gate-shell";
   state: ShellJobState;
   result?: AddOutcome;

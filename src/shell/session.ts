@@ -94,8 +94,9 @@ export function hasPendingShellWork(
 }
 
 export function calculateShellSessionStats(queue: ShellJob[]): ShellSessionStats {
-  const completedJobs = queue.filter((job) => job.state === "done");
-  const failedJobs = queue.filter((job) => job.state === "failed");
+  const captureJobs = queue.filter((job) => job.kind === "capture");
+  const completedJobs = captureJobs.filter((job) => job.state === "done");
+  const failedJobs = captureJobs.filter((job) => job.state === "failed");
   const totalDurationMs = completedJobs.reduce(
     (total, job) => total + getShellJobTotalDuration(job),
     0,

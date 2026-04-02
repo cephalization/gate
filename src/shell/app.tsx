@@ -3,7 +3,7 @@ import React from "react";
 import { Box, Text, render, useApp, useInput } from "ink";
 import type { GateConfig } from "../types.js";
 import { formatDurationMs } from "../timing.js";
-import { getShellHelpLines, parseShellCommand, resolveShellQuitRequest } from "./commands.js";
+import { resolveShellQuitRequest } from "./commands.js";
 import {
   canNavigateShellHistory,
   getShellSubmitModeLabel,
@@ -28,7 +28,13 @@ export interface StartShellOptions {
 
 function ShellApp({ config, configPath }: StartShellOptions) {
   const { exit } = useApp();
-  const [worker] = React.useState(() => createShellWorker({ config }));
+  const requestQuitRef = React.useRef<() => void>(() => {});
+  const [worker] = React.useState(() =>
+    createShellWorker({
+      config,
+      requestQuit: () => requestQuitRef.current(),
+    }),
+  );
   const [state, setState] = React.useState(() => worker.getState() ?? createShellSessionState());
   const [input, setInput] = React.useState("");
   const [history, setHistory] = React.useState<string[]>([]);
@@ -73,6 +79,10 @@ function ShellApp({ config, configPath }: StartShellOptions) {
     },
     [appendLog, exit, worker],
   );
+
+  requestQuitRef.current = () => {
+    requestQuit("command");
+  };
 
   React.useEffect(() => {
     if (!hasPendingShellWork(state) && hasWarnedAboutPendingQuit) {
@@ -125,28 +135,6 @@ function ShellApp({ config, configPath }: StartShellOptions) {
     if (isShellSubmitKey(state.submitMode, key)) {
       const submitted = input.trim();
       if (!submitted) {
-        return;
-      }
-
-      const command = parseShellCommand(submitted);
-      if (command.name === "help") {
-        for (const line of getShellHelpLines()) {
-          appendLog("command", line);
-        }
-        setInput("");
-        setHistory((current) => pushShellHistory(current, submitted));
-        setHistoryIndex(null);
-        setHistoryDraft("");
-        return;
-      }
-
-      if (command.name === "quit") {
-        appendLog("command", "/quit");
-        setInput("");
-        setHistory((current) => pushShellHistory(current, submitted));
-        setHistoryIndex(null);
-        setHistoryDraft("");
-        requestQuit("command");
         return;
       }
 

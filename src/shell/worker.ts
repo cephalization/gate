@@ -1,6 +1,7 @@
 import { captureNoteWithHooks } from "../note/upsert.js";
 import type { CaptureHooks } from "../note/capture-pipeline.js";
 import type { AddOutcome, GateConfig } from "../types.js";
+import { getShellHelpLines, parseShellCommand } from "./commands.js";
 import {
   createQueuedShellLogEvent,
   createShellJobErrorLogEvent,
@@ -45,6 +46,7 @@ export interface ShellWorkerDependencies {
   createJobId?: () => string;
   createEventId?: () => string;
   now?: () => string;
+  requestQuit?: () => void;
 }
 
 export interface ShellWorker {
@@ -85,6 +87,41 @@ export function createShellWorker(options: CreateShellWorkerOptions): ShellWorke
     return publishState(update(state));
   };
 
+  const processCommandJob = async (job: ShellJob): Promise<void> => {
+    const timestamp = now();
+    const command = parseShellCommand(job.input);
+
+    setState((current) =>
+      appendShellLogEvent(current, {
+        id: createEventId(),
+        timestamp,
+        kind: "command",
+        message: command.raw,
+      }),
+    );
+
+    if (command.name === "help") {
+      for (const line of getShellHelpLines()) {
+        setState((current) =>
+          appendShellLogEvent(current, {
+            id: createEventId(),
+            timestamp: now(),
+            kind: "system",
+            message: line,
+          }),
+        );
+      }
+    }
+
+    if (command.name === "quit") {
+      options.requestQuit?.();
+    }
+
+    setState((current) =>
+      updateShellSessionJob(current, job.id, (queuedJob) => completeShellJob(queuedJob)),
+    );
+  };
+
   const processNextQueuedJob = async (): Promise<void> => {
     if (processing) {
       return;
@@ -99,6 +136,11 @@ export function createShellWorker(options: CreateShellWorkerOptions): ShellWorke
     setState((current) => setActiveShellJobId(current, nextJob.id));
 
     try {
+      if (nextJob.kind === "command") {
+        await processCommandJob(nextJob);
+        return;
+      }
+
       const result = await capture(options.config, nextJob.input, nextJob.source, {
         onStageChange: async (stage) => {
           const nextState = STAGE_TO_JOB_STATE[stage];
@@ -177,6 +219,7 @@ export function createShellWorker(options: CreateShellWorkerOptions): ShellWorke
         id: createJobId(),
         input,
         createdAt: now(),
+        kind: parseShellCommand(input).name === null ? "capture" : "command",
       });
 
       setState((current) =>

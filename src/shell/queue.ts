@@ -6,13 +6,20 @@ export interface CreateShellJobInput {
   id: string;
   input: string;
   createdAt: string;
+  kind?: ShellJob["kind"];
 }
 
-export function createShellJob({ id, input, createdAt }: CreateShellJobInput): ShellJob {
+export function createShellJob({
+  id,
+  input,
+  createdAt,
+  kind = "capture",
+}: CreateShellJobInput): ShellJob {
   return {
     id,
     createdAt,
     input,
+    kind,
     source: "gate-shell",
     state: "queued",
     timings: {},
@@ -24,7 +31,11 @@ export function enqueueShellJob(queue: ShellJob[], job: ShellJob): ShellJob[] {
 }
 
 export function getNextQueuedShellJob(queue: ShellJob[]): ShellJob | null {
-  return queue.find((job) => job.state === "queued") ?? null;
+  return (
+    queue.find((job) => job.state === "queued" && job.kind === "command") ??
+    queue.find((job) => job.state === "queued" && job.kind === "capture") ??
+    null
+  );
 }
 
 export function updateShellJob(
@@ -56,7 +67,7 @@ export function recordShellJobTiming(
   };
 }
 
-export function completeShellJob(job: ShellJob, result: AddOutcome): ShellJob {
+export function completeShellJob(job: ShellJob, result?: AddOutcome): ShellJob {
   return {
     ...job,
     state: "done",
