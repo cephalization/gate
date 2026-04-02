@@ -37,3 +37,10 @@ Use this knowledge to avoid repeating mistakes and build on what works.
 - Commander `configureHelp({ formatHelp })` should not call `helper.formatHelp(...)` from inside the override, because that recurses back into the same override. For this repo, printing the custom bare-`gate` help text from `src/cli.ts` is the safer pattern.
 - A built-CLI smoke test in `test/cli-shell-help.test.mjs` is a better fit than a source-level `.ts` test here, because the repo uses ESM `.js` specifiers in source and the acceptance criteria are about the shipped command surface.
 - `resolveConfigPath()` is a useful small helper for keeping `loadConfig()`, `saveConfig()`, and shell startup aligned on the exact config file path being used.
+
+## 99j95ubo
+
+- A small mutable `createShellWorker()` store is enough to keep the Ink shell non-blocking while still reusing the shared `captureNoteWithHooks()` pipeline for every stage transition and timing update.
+- Publishing stage changes from the pipeline hooks directly into both `ShellJob.state` and the activity log keeps worker progress durable without duplicating the capture logic in shell-specific code.
+- For focused shell tests in this repo, compile a `.test.ts` file into a temporary directory inside the repo before running `node --test`; compiling outside the workspace breaks package resolution for runtime deps like `ai`.
+- `vp check --fix` is the fastest way to align new Ink/worker files with the project formatter before the required verification pass.

@@ -1,0 +1,158 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createShellWorker } from "../src/shell/worker.js";
+
+const config = {
+  vaultPath: "/tmp/gate-shell-worker-test-vault",
+  defaultFolder: "Inbox",
+  ai: {
+    enabled: true,
+    provider: "openai",
+    model: "gpt-4.1-mini",
+    temperature: 0.1,
+    maxTokens: 600,
+  },
+  merge: {
+    autoThreshold: 0.85,
+    suggestThreshold: 0.7,
+  },
+};
+
+function createSuccessOutcome(title: string) {
+  return {
+    success: true,
+    action: "created" as const,
+    title,
+    filePath: `/tmp/${title}.md`,
+    noteId: `${title}-id`,
+    aiEnriched: false,
+    related: [],
+    timings: {},
+  };
+}
+
+function createDeferred() {
+  let resolve: () => void;
+  let reject: (error?: unknown) => void;
+  const promise = new Promise<void>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, resolve: resolve!, reject: reject! };
+}
+
+async function flush(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+async function waitFor<T>(assertion: () => T | null | false, timeoutMs = 2000): Promise<T> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const result = assertion();
+    if (result) {
+      return result;
+    }
+
+    await flush();
+  }
+
+  throw new Error("Timed out waiting for condition");
+}
+
+test("shell worker processes queued jobs one at a time and records stage timings", async () => {
+  const started: string[] = [];
+  const firstJob = createDeferred();
+
+  const worker = createShellWorker({
+    config,
+    createJobId: (() => {
+      let nextId = 1;
+      return () => String(nextId++);
+    })(),
+    now: (() => {
+      let nextTick = 0;
+      return () => `2026-04-02T00:00:0${nextTick++}.000Z`;
+    })(),
+    capture: async (_config, text, _source, hooks = {}) => {
+      started.push(text);
+      await hooks.onStageChange?.("refresh");
+      await hooks.onTiming?.("refresh", 5);
+
+      if (text === "first capture") {
+        await firstJob.promise;
+      }
+
+      await hooks.onStageChange?.("write");
+      await hooks.onTiming?.("write", 11);
+      await hooks.onStageChange?.("reindex");
+      await hooks.onTiming?.("reindex", 7);
+      return createSuccessOutcome(text.split(" ").join("-"));
+    },
+  });
+
+  worker.enqueue("first capture");
+  worker.enqueue("second capture");
+
+  await waitFor(() => (worker.getState().activeJobId === "1" ? true : null));
+
+  let state = worker.getState();
+  assert.deepEqual(started, ["first capture"]);
+  assert.equal(state.queue[0]?.state, "refreshing");
+  assert.equal(state.queue[0]?.timings.refresh, 5);
+  assert.equal(state.queue[1]?.state, "queued");
+
+  firstJob.resolve();
+
+  await waitFor(() => (worker.getState().stats.completed === 2 ? true : null));
+
+  state = worker.getState();
+  assert.deepEqual(started, ["first capture", "second capture"]);
+  assert.equal(state.activeJobId, null);
+  assert.equal(state.queue[0]?.state, "done");
+  assert.equal(state.queue[0]?.timings.write, 11);
+  assert.equal(state.queue[0]?.timings.reindex, 7);
+  assert.equal(state.queue[1]?.state, "done");
+  assert.equal(state.stats.failed, 0);
+  assert.ok(state.log.some((event) => event.message === "refreshing #1"));
+  assert.ok(state.log.some((event) => event.message === "done #2 created: second-capture 23ms"));
+});
+
+test("shell worker logs failures and continues processing later jobs", async () => {
+  const worker = createShellWorker({
+    config,
+    now: (() => {
+      let nextTick = 0;
+      return () => `2026-04-02T00:01:0${nextTick++}.000Z`;
+    })(),
+    capture: async (_config, text, _source, hooks = {}) => {
+      await hooks.onStageChange?.("search");
+      await hooks.onTiming?.("search", 3);
+
+      if (text === "broken capture") {
+        throw new Error("search failed");
+      }
+
+      await hooks.onStageChange?.("write");
+      await hooks.onTiming?.("write", 2);
+      return createSuccessOutcome("recovered-note");
+    },
+  });
+
+  worker.enqueue("broken capture");
+  worker.enqueue("healthy capture");
+
+  await waitFor(() => {
+    const state = worker.getState();
+    return state.stats.failed === 1 && state.stats.completed === 1 && state.activeJobId === null
+      ? true
+      : null;
+  });
+
+  const state = worker.getState();
+  assert.equal(state.queue[0]?.state, "failed");
+  assert.equal(state.queue[0]?.error, "search failed");
+  assert.equal(state.queue[1]?.state, "done");
+  assert.ok(state.log.some((event) => event.message === "failed #1 search failed"));
+  assert.ok(state.log.some((event) => event.message === "done #2 created: recovered-note 5ms"));
+});
