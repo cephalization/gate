@@ -30,3 +30,10 @@ Use this knowledge to avoid repeating mistakes and build on what works.
 - Deriving session stats from the queue keeps reducers deterministic and avoids hidden counters drifting out of sync once retries or failures are introduced later.
 - For focused TypeScript unit tests in this repo, compiling a `.test.ts` file with `pnpm exec tsc --module NodeNext --moduleResolution NodeNext --types node` is more reliable than importing source `.ts` files directly with Node.
 - Queue depth is easier to reason about as "queued but not currently active" so the status bar can show pending backlog separately from worker busy/idle state.
+
+## rwq941ap
+
+- Keep the shell bootstrap thin: a dedicated `handleShell()` plus `startShell()` boundary lets the CLI own config/store startup now without forcing worker or input logic into the first pass.
+- Commander `configureHelp({ formatHelp })` should not call `helper.formatHelp(...)` from inside the override, because that recurses back into the same override. For this repo, printing the custom bare-`gate` help text from `src/cli.ts` is the safer pattern.
+- A built-CLI smoke test in `test/cli-shell-help.test.mjs` is a better fit than a source-level `.ts` test here, because the repo uses ESM `.js` specifiers in source and the acceptance criteria are about the shipped command surface.
+- `resolveConfigPath()` is a useful small helper for keeping `loadConfig()`, `saveConfig()`, and shell startup aligned on the exact config file path being used.

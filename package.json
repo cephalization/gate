@@ -25,10 +25,13 @@
     "@tobilu/qmd": "^2.0.1",
     "ai": "^4.0.0",
     "commander": "^13.0.0",
+    "ink": "^6.8.0",
+    "react": "^19.2.4",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
     "typescript": "^5.9.3",
     "vite-plus": "^0.1.15-alpha.5"
   },

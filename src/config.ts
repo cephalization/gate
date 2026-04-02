@@ -14,6 +14,10 @@ export function getConfigPath(): string {
   return path.join(CONFIG_DIR, CONFIG_FILE);
 }
 
+export function resolveConfigPath(customPath?: string): string {
+  return customPath ?? getConfigPath();
+}
+
 export function getGateDataDir(vaultPath: string): string {
   return path.join(vaultPath, ".gate");
 }
@@ -32,7 +36,7 @@ export async function configExists(): Promise<boolean> {
 }
 
 export async function loadConfig(customPath?: string): Promise<GateConfig | null> {
-  const configPath = customPath ?? getConfigPath();
+  const configPath = resolveConfigPath(customPath);
 
   try {
     const content = await fs.readFile(configPath, "utf-8");
@@ -48,7 +52,7 @@ export async function loadConfig(customPath?: string): Promise<GateConfig | null
 }
 
 export async function saveConfig(config: GateConfig, customPath?: string): Promise<void> {
-  const configPath = customPath ?? getConfigPath();
+  const configPath = resolveConfigPath(customPath);
   const configDir = path.dirname(configPath);
 
   // Ensure config directory exists
