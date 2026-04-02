@@ -180,17 +180,15 @@ function ShellApp({ config, configPath }: StartShellOptions) {
     <Box flexDirection="column">
       <Box borderStyle="round" flexDirection="column" paddingX={1}>
         <Text>
-          gate shell | vault: {vaultName} | queue: {queueDepth} | worker: {workerState}
+          gate shell | vault: {vaultName} | queue: {queueDepth} | worker: {workerState} | mode:{" "}
+          {submitModeLabel} | completed: {state.stats.completed} | failed: {state.stats.failed} |
+          avg: {formatDurationMs(Math.round(state.stats.averageDurationMs))}
         </Text>
         <Text color="cyan">
           system freeform captures queue immediately and process in background
         </Text>
         <Text>system config: {configPath}</Text>
         <Text>system vault: {config.vaultPath}</Text>
-        <Text>
-          system completed: {state.stats.completed} | failed: {state.stats.failed} | avg:{" "}
-          {formatDurationMs(Math.round(state.stats.averageDurationMs))}
-        </Text>
         <Text dimColor>
           hint {submitModeLabel} | Ctrl+J toggle submit mode | Up/Down history | /help | Ctrl+C
           quits

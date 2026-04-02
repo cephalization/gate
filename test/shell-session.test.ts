@@ -220,7 +220,7 @@ test("event helpers emit stable user-facing log lines", () => {
   );
   const resultEvent = createShellJobResultLogEvent("evt-2", queued.createdAt, completed);
   assert.equal(resultEvent.kind, "result");
-  assert.equal(resultEvent.message, "done #106 created: quoted-note 900ms");
+  assert.equal(resultEvent.message, "done #106 created: quoted-note 900ms [write 900ms]");
 
   const errorEvent = createShellJobErrorLogEvent(
     "evt-3",
@@ -292,6 +292,6 @@ test("queue inspection lines summarize active, queued, recent, and counts", () =
     'queue active #303 searching "active capture"',
     'queue queued #304 "queued capture"',
     "queue recent #302 failed write failed",
-    "queue recent #301 created: finished-capture 12ms",
+    "queue recent #301 created: finished-capture 12ms [search 5ms, write 7ms]",
   ]);
 });

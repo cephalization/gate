@@ -78,3 +78,10 @@ Use this knowledge to avoid repeating mistakes and build on what works.
 - Treat all slash-prefixed inputs as command jobs, including invalid ones; otherwise inputs like `/search` with a missing query fall through as captures instead of surfacing a command error in the activity log.
 - Compact log lines work best with vault-relative paths, so shell output stays readable without losing which note matched.
 - `expect` can still launch the Ink shell for smoke tests here, but Enter submission remains unreliable in automation even with fixed `COLUMNS` and `LINES`, so focused worker tests are the dependable verification path for slash-command behavior.
+
+## g3c6xho7
+
+- Reusing shared shell-formatting helpers for both activity-log events and `/queue` summaries keeps the finished-job wording aligned while letting queue snapshots keep their slightly different prefixes.
+- Stage timings are most useful when shown as `total [stage x, stage y]`; this closed the v1 acceptance gap without changing the underlying worker or capture pipeline state model.
+- Failure summaries should carry the same timing suffix as successful jobs when timings exist, so a scrolled-off stage-transition line is not the only place the operator can see where work failed.
+- Focused shell verification is still best done with worker/session tests plus `vp pack` and `vp check`; fully automated raw-mode Ink submission remains unreliable here for manual-interaction coverage.

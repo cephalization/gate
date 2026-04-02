@@ -1,3 +1,4 @@
+import { formatShellJobResultMessage, formatShellJobTimingSummary } from "./events.js";
 import { enqueueShellJob, getShellJobTotalDuration, updateShellJob } from "./queue.js";
 import {
   SHELL_JOB_STATES,
@@ -178,10 +179,8 @@ export function syncShellSessionStats(state: ShellSessionState): ShellSessionSta
 
 function formatShellQueueRecentLine(job: ShellJob): string {
   if (job.state === "failed") {
-    return `queue recent #${job.id} failed ${job.error ?? "Unknown error"}`;
+    return `queue recent #${job.id} failed ${job.error ?? "Unknown error"}${formatShellJobTimingSummary(job.timings)}`;
   }
 
-  const action = job.result?.action ?? "completed";
-  const title = job.result?.title ?? "unknown";
-  return `queue recent #${job.id} ${action}: ${title} ${getShellJobTotalDuration(job)}ms`;
+  return `queue recent ${formatShellJobResultMessage(job).slice("done".length + 1)}`;
 }

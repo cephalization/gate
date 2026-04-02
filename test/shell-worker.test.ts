@@ -115,7 +115,13 @@ test("shell worker processes queued jobs one at a time and records stage timings
   assert.equal(state.queue[1]?.state, "done");
   assert.equal(state.stats.failed, 0);
   assert.ok(state.log.some((event) => event.message === "refreshing #1"));
-  assert.ok(state.log.some((event) => event.message === "done #2 created: second-capture 23ms"));
+  assert.ok(
+    state.log.some(
+      (event) =>
+        event.message ===
+        "done #2 created: second-capture 23ms [refresh 5ms, write 11ms, reindex 7ms]",
+    ),
+  );
 });
 
 test("shell worker logs failures and continues processing later jobs", async () => {
@@ -153,8 +159,14 @@ test("shell worker logs failures and continues processing later jobs", async () 
   assert.equal(state.queue[0]?.state, "failed");
   assert.equal(state.queue[0]?.error, "search failed");
   assert.equal(state.queue[1]?.state, "done");
-  assert.ok(state.log.some((event) => event.message === "failed #1 search failed"));
-  assert.ok(state.log.some((event) => event.message === "done #2 created: recovered-note 5ms"));
+  assert.ok(
+    state.log.some((event) => event.message === "failed #1 search failed 3ms [search 3ms]"),
+  );
+  assert.ok(
+    state.log.some(
+      (event) => event.message === "done #2 created: recovered-note 5ms [search 3ms, write 2ms]",
+    ),
+  );
 });
 
 test("shell worker prioritizes queued slash commands ahead of later captures", async () => {
@@ -339,5 +351,9 @@ test("shell worker renders queue inspection lines from session state", async () 
   assert.ok(messages.includes("queue counts queued:1 done:1"));
   assert.ok(messages.includes("queue active idle"));
   assert.ok(messages.includes('queue queued #2 "second capture"'));
-  assert.ok(messages.includes("queue recent #1 created: first-capture 23ms"));
+  assert.ok(
+    messages.includes(
+      "queue recent #1 created: first-capture 23ms [refresh 5ms, write 11ms, reindex 7ms]",
+    ),
+  );
 });
