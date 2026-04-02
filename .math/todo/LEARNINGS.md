@@ -51,3 +51,10 @@ Use this knowledge to avoid repeating mistakes and build on what works.
 - `Ctrl+J` handling needs to be checked before normal Enter handling because some terminals report it as a control-return style key event rather than plain text input.
 - Restricting history navigation to single-line entries keeps multiline compose stable and matches the "capture first" shell workflow instead of letting Up/Down unexpectedly replace a draft with a multiline payload.
 - For this repo's ESM `.js` source imports, the reliable focused test path is still: temporary `tsc` output inside the workspace, then `node --test` on the emitted files.
+
+## wunm86ah
+
+- Keeping slash-command parsing and quit-policy resolution in a small pure `src/shell/commands.ts` module made the new `/help`, `/quit`, and Ctrl+C behavior easy to test without mounting Ink.
+- UI-originated shell log entries need to go through the worker store; app-local log state gets overwritten by the next worker publish.
+- For consistent first-warning/second-force Ctrl+C handling, read pending-work state from `worker.getState()` and track the warning latch in a ref so overlapping interrupt events do not race React state updates.
+- `expect` works better than piped pseudo-tty tricks for manual Ink shell validation in this repo because Ink requires a real raw-mode TTY.

@@ -24,7 +24,7 @@ import {
   toggleShellSubmitMode,
   updateShellSessionJob,
 } from "./session.js";
-import type { ShellJob, ShellSessionState } from "./types.js";
+import type { ShellJob, ShellLogKind, ShellSessionState } from "./types.js";
 
 const STAGE_TO_JOB_STATE = {
   refresh: "refreshing",
@@ -49,6 +49,7 @@ export interface ShellWorkerDependencies {
 
 export interface ShellWorker {
   enqueue: (input: string) => ShellJob;
+  appendLog: (kind: ShellLogKind, message: string) => void;
   getState: () => ShellSessionState;
   subscribe: (listener: (state: ShellSessionState) => void) => () => void;
   toggleSubmitMode: () => void;
@@ -190,6 +191,16 @@ export function createShellWorker(options: CreateShellWorkerOptions): ShellWorke
       });
 
       return job;
+    },
+    appendLog(kind: ShellLogKind, message: string): void {
+      setState((current) =>
+        appendShellLogEvent(current, {
+          id: createEventId(),
+          timestamp: now(),
+          kind,
+          message,
+        }),
+      );
     },
     getState(): ShellSessionState {
       return state;

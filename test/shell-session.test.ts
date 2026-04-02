@@ -24,6 +24,7 @@ import {
   createShellSessionState,
   getShellQueueDepth,
   getShellWorkerState,
+  hasPendingShellWork,
   setActiveShellJobId,
   toggleShellSubmitMode,
   updateShellSessionJob,
@@ -149,17 +150,20 @@ test("session helpers derive stats, queue depth, worker state, and submit mode",
     averageDurationMs: 3000,
   });
   assert.equal(getShellQueueDepth(state), 1);
+  assert.equal(hasPendingShellWork(state), true);
   assert.equal(getShellWorkerState(state), "idle");
   assert.equal(toggleShellSubmitMode(state.submitMode), "shift-enter-submit");
 
   state = setActiveShellJobId(state, "103");
   assert.equal(getShellWorkerState(state), "busy");
   assert.equal(getShellQueueDepth(state), 0);
+  assert.equal(hasPendingShellWork(state), true);
 
   const searchingState = updateShellSessionJob(state, "103", (job) =>
     transitionShellJob(job, "searching"),
   );
   assert.equal(searchingState.queue.find((job) => job.id === "103")?.state, "searching");
+  assert.equal(hasPendingShellWork(createShellSessionState()), false);
 });
 
 test("event helpers emit stable user-facing log lines", () => {

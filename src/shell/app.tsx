@@ -1,8 +1,9 @@
 import path from "node:path";
 import React from "react";
-import { Box, Text, render, useInput } from "ink";
+import { Box, Text, render, useApp, useInput } from "ink";
 import type { GateConfig } from "../types.js";
 import { formatDurationMs } from "../timing.js";
+import { getShellHelpLines, parseShellCommand, resolveShellQuitRequest } from "./commands.js";
 import {
   canNavigateShellHistory,
   getShellSubmitModeLabel,
@@ -12,7 +13,12 @@ import {
   navigateShellHistory,
   pushShellHistory,
 } from "./input.js";
-import { createShellSessionState, getShellQueueDepth, getShellWorkerState } from "./session.js";
+import {
+  createShellSessionState,
+  getShellQueueDepth,
+  getShellWorkerState,
+  hasPendingShellWork,
+} from "./session.js";
 import { createShellWorker } from "./worker.js";
 
 export interface StartShellOptions {
@@ -21,16 +27,77 @@ export interface StartShellOptions {
 }
 
 function ShellApp({ config, configPath }: StartShellOptions) {
+  const { exit } = useApp();
   const [worker] = React.useState(() => createShellWorker({ config }));
   const [state, setState] = React.useState(() => worker.getState() ?? createShellSessionState());
   const [input, setInput] = React.useState("");
   const [history, setHistory] = React.useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = React.useState<number | null>(null);
   const [historyDraft, setHistoryDraft] = React.useState("");
+  const [hasWarnedAboutPendingQuit, setHasWarnedAboutPendingQuit] = React.useState(false);
+  const hasWarnedAboutPendingQuitRef = React.useRef(false);
 
   React.useEffect(() => worker.subscribe(setState), [worker]);
 
+  const appendLog = React.useCallback(
+    (kind: "system" | "command" | "error", message: string) => {
+      worker.appendLog(kind, message);
+    },
+    [worker],
+  );
+
+  const requestQuit = React.useCallback(
+    (source: "interrupt" | "command") => {
+      const currentState = worker.getState();
+      const nextAction = resolveShellQuitRequest({
+        hasPendingWork: hasPendingShellWork(currentState),
+        hasWarnedAboutPendingWork: hasWarnedAboutPendingQuitRef.current,
+        source,
+      });
+
+      hasWarnedAboutPendingQuitRef.current = nextAction.nextWarnedAboutPendingWork;
+      setHasWarnedAboutPendingQuit(nextAction.nextWarnedAboutPendingWork);
+
+      if (nextAction.shouldWarn && nextAction.warningMessage) {
+        appendLog(source === "interrupt" ? "error" : "system", nextAction.warningMessage);
+        return;
+      }
+
+      if (nextAction.forceExit) {
+        appendLog("error", "forcing shell exit with pending work");
+      }
+
+      if (nextAction.shouldExit) {
+        exit();
+      }
+    },
+    [appendLog, exit, worker],
+  );
+
+  React.useEffect(() => {
+    if (!hasPendingShellWork(state) && hasWarnedAboutPendingQuit) {
+      hasWarnedAboutPendingQuitRef.current = false;
+      setHasWarnedAboutPendingQuit(false);
+    }
+  }, [hasWarnedAboutPendingQuit, state]);
+
+  React.useEffect(() => {
+    const handleSigint = () => {
+      requestQuit("interrupt");
+    };
+
+    process.on("SIGINT", handleSigint);
+    return () => {
+      process.off("SIGINT", handleSigint);
+    };
+  }, [requestQuit]);
+
   useInput((value, key) => {
+    if (key.ctrl && value.toLowerCase() === "c") {
+      requestQuit("interrupt");
+      return;
+    }
+
     if (isShellSubmitModeToggleKey(value, key)) {
       worker.toggleSubmitMode();
       return;
@@ -58,6 +125,28 @@ function ShellApp({ config, configPath }: StartShellOptions) {
     if (isShellSubmitKey(state.submitMode, key)) {
       const submitted = input.trim();
       if (!submitted) {
+        return;
+      }
+
+      const command = parseShellCommand(submitted);
+      if (command.name === "help") {
+        for (const line of getShellHelpLines()) {
+          appendLog("command", line);
+        }
+        setInput("");
+        setHistory((current) => pushShellHistory(current, submitted));
+        setHistoryIndex(null);
+        setHistoryDraft("");
+        return;
+      }
+
+      if (command.name === "quit") {
+        appendLog("command", "/quit");
+        setInput("");
+        setHistory((current) => pushShellHistory(current, submitted));
+        setHistoryIndex(null);
+        setHistoryDraft("");
+        requestQuit("command");
         return;
       }
 
@@ -115,7 +204,8 @@ function ShellApp({ config, configPath }: StartShellOptions) {
           {formatDurationMs(Math.round(state.stats.averageDurationMs))}
         </Text>
         <Text dimColor>
-          hint {submitModeLabel} | Ctrl+J toggle submit mode | Up/Down history | Ctrl+C quits
+          hint {submitModeLabel} | Ctrl+J toggle submit mode | Up/Down history | /help | Ctrl+C
+          quits
         </Text>
         <Box marginTop={1} borderTop borderStyle="single" paddingTop={1}>
           {visibleLog.length === 0 ? (
@@ -150,7 +240,7 @@ function ShellApp({ config, configPath }: StartShellOptions) {
 
 export async function startShell(options: StartShellOptions): Promise<void> {
   const instance = render(<ShellApp {...options} />, {
-    exitOnCtrlC: true,
+    exitOnCtrlC: false,
   });
 
   await instance.waitUntilExit();

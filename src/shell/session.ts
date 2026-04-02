@@ -87,6 +87,12 @@ export function getShellWorkerState(
   return state.activeJobId ? "busy" : "idle";
 }
 
+export function hasPendingShellWork(
+  state: Pick<ShellSessionState, "queue" | "activeJobId">,
+): boolean {
+  return state.activeJobId !== null || getShellQueueDepth(state) > 0;
+}
+
 export function calculateShellSessionStats(queue: ShellJob[]): ShellSessionStats {
   const completedJobs = queue.filter((job) => job.state === "done");
   const failedJobs = queue.filter((job) => job.state === "failed");
