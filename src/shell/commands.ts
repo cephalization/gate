@@ -1,4 +1,4 @@
-export type ShellCommandName = "help" | "quit";
+export type ShellCommandName = "help" | "quit" | "queue";
 
 export type ParsedShellCommand =
   | {
@@ -29,6 +29,7 @@ export interface ResolveShellQuitRequestResult {
 const SHELL_HELP_LINES = [
   "commands:",
   "/help show available shell commands",
+  "/queue show queued jobs, active work, recent finished jobs, and state counts",
   "/quit quit when idle, or warn if work is still pending",
 ] as const;
 
@@ -41,6 +42,10 @@ export function parseShellCommand(input: string): ParsedShellCommand {
 
   if (raw === "/quit") {
     return { name: "quit", raw };
+  }
+
+  if (raw === "/queue") {
+    return { name: "queue", raw };
   }
 
   return { name: null, raw };

@@ -226,3 +226,53 @@ test("shell worker runs queued quit commands through the injected quit handler",
   assert.equal(state.queue[0]?.kind, "command");
   assert.ok(state.log.some((event) => event.message === "/quit"));
 });
+
+test("shell worker renders queue inspection lines from session state", async () => {
+  const firstJob = createDeferred();
+
+  const worker = createShellWorker({
+    config,
+    createJobId: (() => {
+      let nextId = 1;
+      return () => String(nextId++);
+    })(),
+    now: (() => {
+      let nextTick = 0;
+      return () => `2026-04-02T00:03:0${nextTick++}.000Z`;
+    })(),
+    capture: async (_config, text, _source, hooks = {}) => {
+      await hooks.onStageChange?.("refresh");
+      await hooks.onTiming?.("refresh", 5);
+
+      if (text === "first capture") {
+        await firstJob.promise;
+      }
+
+      await hooks.onStageChange?.("write");
+      await hooks.onTiming?.("write", 11);
+      await hooks.onStageChange?.("reindex");
+      await hooks.onTiming?.("reindex", 7);
+      return createSuccessOutcome(text.split(" ").join("-"));
+    },
+  });
+
+  worker.enqueue("first capture");
+
+  await waitFor(() => (worker.getState().activeJobId === "1" ? true : null));
+
+  worker.enqueue("second capture");
+  worker.enqueue("/queue");
+  firstJob.resolve();
+
+  await waitFor(() => {
+    const state = worker.getState();
+    return state.queue.every((job) => job.state === "done") ? true : null;
+  });
+
+  const messages = worker.getState().log.map((event) => event.message);
+  assert.ok(messages.includes("/queue"));
+  assert.ok(messages.includes("queue counts queued:1 done:1"));
+  assert.ok(messages.includes("queue active idle"));
+  assert.ok(messages.includes('queue queued #2 "second capture"'));
+  assert.ok(messages.includes("queue recent #1 created: first-capture 23ms"));
+});

@@ -20,6 +20,7 @@ import {
   addShellJob,
   appendShellLogEvent,
   createShellSessionState,
+  getShellQueueInspectionLines,
   setShellSubmitMode,
   setActiveShellJobId,
   toggleShellSubmitMode,
@@ -102,6 +103,19 @@ export function createShellWorker(options: CreateShellWorkerOptions): ShellWorke
 
     if (command.name === "help") {
       for (const line of getShellHelpLines()) {
+        setState((current) =>
+          appendShellLogEvent(current, {
+            id: createEventId(),
+            timestamp: now(),
+            kind: "system",
+            message: line,
+          }),
+        );
+      }
+    }
+
+    if (command.name === "queue") {
+      for (const line of getShellQueueInspectionLines(state)) {
         setState((current) =>
           appendShellLogEvent(current, {
             id: createEventId(),

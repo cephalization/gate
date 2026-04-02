@@ -1,11 +1,14 @@
 import { enqueueShellJob, getShellJobTotalDuration, updateShellJob } from "./queue.js";
-import type {
-  ShellJob,
+import {
+  SHELL_JOB_STATES,
+  type ShellJob,
   ShellLogEvent,
   ShellSessionState,
   ShellSessionStats,
   ShellSubmitMode,
 } from "./types.js";
+
+const SHELL_QUEUE_DISPLAY_LIMIT = 3;
 
 export function createShellSessionState(
   submitMode: ShellSubmitMode = "enter-submit",
@@ -93,6 +96,63 @@ export function hasPendingShellWork(
   return state.activeJobId !== null || getShellQueueDepth(state) > 0;
 }
 
+export function getShellQueueInspectionLines(
+  state: Pick<ShellSessionState, "queue" | "activeJobId">,
+): string[] {
+  const captureJobs = state.queue.filter((job) => job.kind === "capture");
+  const activeCaptureJob =
+    state.activeJobId === null
+      ? null
+      : (captureJobs.find((job) => job.id === state.activeJobId) ?? null);
+  const queuedCaptureJobs = captureJobs.filter(
+    (job) => job.state === "queued" && job.id !== state.activeJobId,
+  );
+  const finishedCaptureJobs = captureJobs
+    .filter((job) => job.state === "done" || job.state === "failed")
+    .slice(-SHELL_QUEUE_DISPLAY_LIMIT)
+    .reverse();
+  const stateCounts = new Map<string, number>();
+
+  for (const job of captureJobs) {
+    stateCounts.set(job.state, (stateCounts.get(job.state) ?? 0) + 1);
+  }
+
+  const countsSummary = SHELL_JOB_STATES.filter(
+    (shellJobState) => (stateCounts.get(shellJobState) ?? 0) > 0,
+  )
+    .map((shellJobState) => `${shellJobState}:${stateCounts.get(shellJobState)}`)
+    .join(" ");
+  const lines = [
+    countsSummary.length > 0 ? `queue counts ${countsSummary}` : "queue counts empty",
+    activeCaptureJob
+      ? `queue active #${activeCaptureJob.id} ${activeCaptureJob.state} ${JSON.stringify(activeCaptureJob.input)}`
+      : "queue active idle",
+  ];
+
+  if (queuedCaptureJobs.length === 0) {
+    lines.push("queue queued none");
+  } else {
+    for (const job of queuedCaptureJobs.slice(0, SHELL_QUEUE_DISPLAY_LIMIT)) {
+      lines.push(`queue queued #${job.id} ${JSON.stringify(job.input)}`);
+    }
+
+    const remainingQueuedCount = queuedCaptureJobs.length - SHELL_QUEUE_DISPLAY_LIMIT;
+    if (remainingQueuedCount > 0) {
+      lines.push(`queue queued +${remainingQueuedCount} more`);
+    }
+  }
+
+  if (finishedCaptureJobs.length === 0) {
+    lines.push("queue recent none");
+  } else {
+    for (const job of finishedCaptureJobs) {
+      lines.push(formatShellQueueRecentLine(job));
+    }
+  }
+
+  return lines;
+}
+
 export function calculateShellSessionStats(queue: ShellJob[]): ShellSessionStats {
   const captureJobs = queue.filter((job) => job.kind === "capture");
   const completedJobs = captureJobs.filter((job) => job.state === "done");
@@ -114,4 +174,14 @@ export function syncShellSessionStats(state: ShellSessionState): ShellSessionSta
     ...state,
     stats: calculateShellSessionStats(state.queue),
   };
+}
+
+function formatShellQueueRecentLine(job: ShellJob): string {
+  if (job.state === "failed") {
+    return `queue recent #${job.id} failed ${job.error ?? "Unknown error"}`;
+  }
+
+  const action = job.result?.action ?? "completed";
+  const title = job.result?.title ?? "unknown";
+  return `queue recent #${job.id} ${action}: ${title} ${getShellJobTotalDuration(job)}ms`;
 }

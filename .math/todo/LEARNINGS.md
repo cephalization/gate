@@ -64,3 +64,10 @@ Use this knowledge to avoid repeating mistakes and build on what works.
 - Treating slash inputs as a separate shell job kind let the existing worker queue schedule commands ahead of later captures without adding a second queue or preempting the active capture.
 - Session stats should continue to reflect capture throughput only; counting completed command jobs would make the shell header misleading after frequent `/help` or future read-only commands.
 - Manual Ink validation is reliable with `expect`: queue captures and `/help` quickly, then assert the help output appears before the later capture completes and that the temp vault only contains the capture-created notes.
+
+## 980qa8wu
+
+- `/queue` is easiest to keep consistent by deriving compact log lines from `ShellSessionState` in one helper and reusing the same activity-log append path as `/help`.
+- Queue inspection should stay capture-focused: excluding command jobs keeps recent summaries and state counts meaningful and avoids `/queue` reporting itself as the active job.
+- Limiting queued and recent sections to a few lines keeps the snapshot readable within the shell's small visible log window while still showing totals in the counts line.
+- The focused test recipe for this repo is still temporary in-repo `tsc` output plus `node --test`; non-interactive `expect` sessions here launched Ink, but Enter submission did not behave reliably enough to count as a full manual shell validation.

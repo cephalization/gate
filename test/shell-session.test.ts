@@ -22,6 +22,7 @@ import {
   appendShellLogEvent,
   calculateShellSessionStats,
   createShellSessionState,
+  getShellQueueInspectionLines,
   getShellQueueDepth,
   getShellWorkerState,
   hasPendingShellWork,
@@ -228,4 +229,69 @@ test("event helpers emit stable user-facing log lines", () => {
   );
   const stateWithLog = appendShellLogEvent(createShellSessionState(), errorEvent);
   assert.equal(stateWithLog.log[0]?.message, "failed #106 write failed");
+});
+
+test("queue inspection lines summarize active, queued, recent, and counts", () => {
+  const done = completeShellJob(
+    recordShellJobTiming(
+      recordShellJobTiming(
+        createShellJob({
+          id: "301",
+          input: "finished capture",
+          createdAt: "2026-04-02T00:00:00.000Z",
+        }),
+        "search",
+        5,
+      ),
+      "write",
+      7,
+    ),
+    createFinishedOutcome("created", "finished-capture"),
+  );
+  const failed = failShellJob(
+    createShellJob({
+      id: "302",
+      input: "failed capture",
+      createdAt: "2026-04-02T00:00:01.000Z",
+    }),
+    "write failed",
+  );
+  const active = recordShellJobTiming(
+    transitionShellJob(
+      createShellJob({
+        id: "303",
+        input: "active capture",
+        createdAt: "2026-04-02T00:00:02.000Z",
+      }),
+      "searching",
+    ),
+    "refresh",
+    3,
+  );
+  const queued = createShellJob({
+    id: "304",
+    input: "queued capture",
+    createdAt: "2026-04-02T00:00:03.000Z",
+  });
+  const command = completeShellJob(
+    createShellJob({
+      id: "305",
+      input: "/help",
+      createdAt: "2026-04-02T00:00:04.000Z",
+      kind: "command",
+    }),
+  );
+
+  const lines = getShellQueueInspectionLines({
+    queue: [done, failed, active, queued, command],
+    activeJobId: "303",
+  });
+
+  assert.deepEqual(lines, [
+    "queue counts queued:1 searching:1 done:1 failed:1",
+    'queue active #303 searching "active capture"',
+    'queue queued #304 "queued capture"',
+    "queue recent #302 failed write failed",
+    "queue recent #301 created: finished-capture 12ms",
+  ]);
 });

@@ -10,6 +10,7 @@ import {
 test("shell command parser recognizes help and quit slash commands", () => {
   assert.deepEqual(parseShellCommand(" /help "), { name: "help", raw: "/help" });
   assert.deepEqual(parseShellCommand("/quit"), { name: "quit", raw: "/quit" });
+  assert.deepEqual(parseShellCommand("/queue"), { name: "queue", raw: "/queue" });
   assert.deepEqual(parseShellCommand("capture this"), { name: null, raw: "capture this" });
 });
 
@@ -17,6 +18,7 @@ test("shell help lines list supported slash commands", () => {
   assert.deepEqual(getShellHelpLines(), [
     "commands:",
     "/help show available shell commands",
+    "/queue show queued jobs, active work, recent finished jobs, and state counts",
     "/quit quit when idle, or warn if work is still pending",
   ]);
 });
